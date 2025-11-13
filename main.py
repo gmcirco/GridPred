@@ -1,8 +1,8 @@
-import pandas as pd
-import geopandas as gpd
-from shapely.geometry import box
-import matplotlib.pyplot as plt
 import contextily as ctx
+import geopandas as gpd
+import matplotlib.pyplot as plt
+import pandas as pd
+from shapely.geometry import box
 from sklearn.ensemble import RandomForestRegressor
 
 INPUT_FILE_PATH = "/home/gmcirco/Documents/Projects/data/crime_2019-2023_v2.csv"
@@ -11,8 +11,9 @@ INPUT_REGION_PATH = (
     "/home/gmcirco/Documents/Projects/data/malmo_shapefiles/DeSo_Malmö.shp"
 )
 
+GRID_CELL_SIZE_METERS = 300
 DEFAULT_CRS = "4326"
-PROJECTED_CRS = "3857"
+PROJECTED_CRS = "3006"
 
 
 def _raw_points_from_csv(file_path, fields_to_lower=True):
@@ -44,6 +45,10 @@ def _nearest_point_distance(points_gdf, polygon_gdf):
     distances = centroids.apply(lambda g: points_gdf.distance(g).min())
 
     return distances
+
+
+def _get_grid_centroid_xy(grid_polygon):
+    return grid_polygon.centroid.get_coordinates()
 
 
 def input_points_to_spatial(input_points):
@@ -159,7 +164,7 @@ def visualize_predictions_osm(
 
 
 def create_grid(polygon_gdf, cell_size):
-    "Create a regular grid over a polygon shapefile"
+    "Create a regular grid over a polygon shapefile, add x-y coordinates as output"
 
     minx, miny, maxx, maxy = polygon_gdf.total_bounds
     x_coords = list(range(int(minx), int(maxx) + cell_size, cell_size))
@@ -178,6 +183,11 @@ def create_grid(polygon_gdf, cell_size):
     # The 'clip' function is an easier alternative to 'overlay' for simple clipping
     clipped_grid = gpd.clip(grid_gdf, polygon_gdf)
 
+    # add xy-coords
+    coords_xy = _get_grid_centroid_xy(clipped_grid)
+    clipped_grid["x"] = coords_xy["x"]
+    clipped_grid["y"] = coords_xy["y"]
+
     return clipped_grid
 
 
@@ -194,7 +204,7 @@ def main(
     study_region=region,
     do_projection=True,
     projected_crs=PROJECTED_CRS,
-    export_raw=False,
+    export_raw=True,
 ):
 
     # first, take crime points and study region
@@ -208,9 +218,11 @@ def main(
         study_region = study_region.to_crs(projected_crs)
 
     # define grid & clip points to grid
-    region_grid = create_grid(study_region, 500)
+    region_grid = create_grid(study_region, GRID_CELL_SIZE_METERS)
     clipped_points = gpd.clip(points_spatial, study_region)
     clipped_features = gpd.clip(features_spatial, study_region)
+
+    # --------- Add Features ---------#
 
     # then functionality to perform grid counts of outcome variable
     # and add spatial risk factors
@@ -239,18 +251,29 @@ def main(
     # use 2023 crimes as hold-out evaluation for model eval
     # !! TEST ONLY !!
 
-    pred_features = ["crimes_2020", "crimes_2021", "gas_station", "bar", "liquor_store"]
+    pred_features = [
+        "crimes_2020",
+        "crimes_2021",
+        "gas_station",
+        "bar",
+        "liquor_store",
+        "x",
+        "y",
+    ]
     target = "crimes_2022"
     eval_target = "crimes_2023"
 
     X = region_grid[pred_features]
     y = region_grid[target]
 
-    rf = RandomForestRegressor(n_estimators=100, random_state=42)
+    rf = RandomForestRegressor(n_estimators=500, criterion="poisson", random_state=42)
     rf.fit(X, y)
 
     # Predict
     y_pred = rf.predict(X)
+
+    importances = pd.Series(rf.feature_importances_, index=X.columns)
+    print(importances.sort_values(ascending=False))
 
     visualize_predictions_osm(region_grid, y_pred)  # export pred map to osm
 
