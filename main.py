@@ -4,7 +4,7 @@ import argparse
 from src.prediction import GridPred
 from sklearn.ensemble import RandomForestRegressor
 from argparse import Namespace 
-
+from pathlib import Path
 
 def get_parser_args() -> Namespace:
     """
@@ -79,6 +79,20 @@ def get_parser_args() -> Namespace:
 
     return parser.parse_args()
 
+def export_results(gridpred_model, preds, filename="preds.csv"):
+
+    # set up data
+    export_df = gridpred_model.X.copy()
+    export_df["y_eval"] = gridpred_model.eval
+    export_df["y_pred"] = preds
+    export_df = export_df.reset_index().rename(columns={"index": "grid_cell_id"})
+
+    # ensure output directory exists
+    output_dir = Path("output")
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    # export to CSV
+    export_df.to_csv(output_dir / filename, index=False)
 
 def main():
 
@@ -116,14 +130,8 @@ def main():
     # Predict
     y_pred = rf.predict(X)
 
-    # export as dataframe
-    export_df = X.copy()
-    export_df["y_eval"] = eval
-    export_df["y_pred"] = y_pred
-
-    export_df = export_df.reset_index()
-    export_df = export_df.rename(columns={"index": "grid_cell_id"})
-    export_df.to_csv("output/preds.csv", index=False)
+    # export to output folder
+    export_results(gridpred, y_pred)
 
     # print feature importances
     # TODO: in future, can be logged and plotted

@@ -4,7 +4,6 @@ PYTHON := uv run python
 SCRIPT := main.py
 
 # Default arguments for quick testing
-# Note: Only CRIME_CSV is strictly required
 CRIME_CSV := input/hartford_robberies.csv
 REGION_SHP := input/hartford.shp
 FEATURES_CSV := input/hartford_pois.csv
