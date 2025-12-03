@@ -4,13 +4,13 @@ PYTHON := uv run python
 SCRIPT := main.py
 
 # Default arguments for quick testing
-CRIME_CSV := input/hartford_robberies.csv
-REGION_SHP := input/hartford.shp
-FEATURES_CSV := input/hartford_pois.csv
-TIMEVAR := year
-FEATVAR := types
-INPUT_CRS := 3508
-PROJECTED_CRS := 3508
+CRIME_CSV := /home/gmcirco/Documents/Projects/data/crime_2019-2023_v2.csv
+REGION_SHP := /home/gmcirco/Documents/Projects/data/malmo_shapefiles/DeSo_Malmo.shp
+FEATURES_CSV := /home/gmcirco/Documents/Projects/data/features_malmo.csv
+TIMEVAR := yearvar
+FEATVAR := type
+INPUT_CRS := 4326
+PROJECTED_CRS := 3006
 GRID_SIZE := 300
 
 # Default run with ALL inputs present

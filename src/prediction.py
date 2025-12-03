@@ -42,6 +42,7 @@ class GridPred:
         self.features_var = features_names_variable
 
         # init model placeholders
+        self.region_grid = None
         self.X = None
         self.y = None
         self.eval = None
@@ -216,13 +217,27 @@ class GridPred:
             projected_crs,
         )
 
+        # --- FIX: REPROJECT POINTS BEFORE CLIPPING ---
+
+        # Reproject points if projection is enabled and a projected_crs is set
+        if projected_crs is not None:
+            if points_spatial.crs != projected_crs:
+                points_spatial = points_spatial.to_crs(projected_crs)
+
+            if features_spatial is not None and features_spatial.crs != projected_crs:
+                features_spatial = features_spatial.to_crs(projected_crs)
+
+            # Ensure region is also in the projected CRS (if it wasn't already loaded in it)
+            if study_region is not None and study_region.crs != projected_crs:
+                study_region = study_region.to_crs(projected_crs)
+
         # If we didn't get a spatial boundary object, use convex hull of all points
         if study_region is None:
             hull = points_spatial.geometry.union_all().convex_hull
             study_region = gpd.GeoDataFrame(geometry=[hull], crs=points_spatial.crs)
 
         # define the region grid, clip input points to boundry
-        region_grid = self.create_grid(study_region, grid_cell_size)
+        self.region_grid = self.create_grid(study_region, grid_cell_size)
         clipped_points = gpd.clip(points_spatial, study_region)
 
         # optional, if risk features are present, also clip
@@ -237,10 +252,10 @@ class GridPred:
 
         for time in unique_times:
             polygon_counts = self._count_point_in_polygon(
-                clipped_points[clipped_points[self.timevar] == time], region_grid
+                clipped_points[clipped_points[self.timevar] == time], self.region_grid
             )
-            region_grid[f"crimes_{time}"] = (
-                region_grid.index.map(polygon_counts).fillna(0).astype(int)
+            self.region_grid[f"crimes_{time}"] = (
+                self.region_grid.index.map(polygon_counts).fillna(0).astype(int)
             )
 
         # check that we have at least three time periods
@@ -266,9 +281,9 @@ class GridPred:
             for type in unique_types:
                 feature_dist = self._nearest_point_distance(
                     clipped_features[clipped_features[self.features_var] == type],
-                    region_grid,
+                    self.region_grid,
                 )
-                region_grid[type] = feature_dist
+                self.region_grid[type] = feature_dist
 
         # Assuming unique_types contains the risk factors (e.g., 'gas_station', 'bar')
         crime_pred_features = [f"crimes_{t}" for t in time_fit]
@@ -277,6 +292,6 @@ class GridPred:
         target = f"crimes_{time_test}"
         eval_target = f"crimes_{time_eval}"
 
-        self.X = region_grid[pred_features]
-        self.y = region_grid[target]
-        self.eval = region_grid[eval_target]
+        self.X = self.region_grid[pred_features]
+        self.y = self.region_grid[target]
+        self.eval = self.region_grid[eval_target]

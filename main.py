@@ -2,6 +2,7 @@ import pandas as pd
 import argparse
 
 from src.prediction import GridPred
+from src.plotting import visualize_predictions
 from sklearn.ensemble import RandomForestRegressor
 from argparse import Namespace 
 from pathlib import Path
@@ -122,7 +123,6 @@ def main():
     # can replace with xgboost or whatever model
     X = gridpred.X
     y = gridpred.y
-    eval = gridpred.eval
 
     rf = RandomForestRegressor(n_estimators=1000, criterion="poisson", random_state=42)
     rf.fit(X, y)
@@ -137,6 +137,11 @@ def main():
     # TODO: in future, can be logged and plotted
     importances = pd.Series(rf.feature_importances_, index=X.columns)
     print(importances.sort_values(ascending=False))
+
+    # plotting
+    region_grid = gridpred.region_grid
+    visualize_predictions(region_grid, y_pred)
+
 
 
 if __name__ == "__main__":
