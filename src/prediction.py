@@ -217,8 +217,6 @@ class GridPred:
             projected_crs,
         )
 
-        # --- FIX: REPROJECT POINTS BEFORE CLIPPING ---
-
         # Reproject points if projection is enabled and a projected_crs is set
         if projected_crs is not None:
             if points_spatial.crs != projected_crs:

@@ -3,9 +3,11 @@ import argparse
 
 from src.prediction import GridPred
 from src.plotting import visualize_predictions
-from sklearn.ensemble import RandomForestRegressor
-from argparse import Namespace 
+from src.model.random_forest import RandomForestGridPred
+from src.evaluate.metrics import pai, pei, rri, evaluate
+from argparse import Namespace
 from pathlib import Path
+
 
 def get_parser_args() -> Namespace:
     """
@@ -80,6 +82,7 @@ def get_parser_args() -> Namespace:
 
     return parser.parse_args()
 
+
 def export_results(gridpred_model, preds, filename="preds.csv"):
 
     # set up data
@@ -94,6 +97,7 @@ def export_results(gridpred_model, preds, filename="preds.csv"):
 
     # export to CSV
     export_df.to_csv(output_dir / filename, index=False)
+
 
 def main():
 
@@ -124,7 +128,9 @@ def main():
     X = gridpred.X
     y = gridpred.y
 
-    rf = RandomForestRegressor(n_estimators=1000, criterion="poisson", random_state=42)
+    rf = RandomForestGridPred(
+        n_estimators=1000, criterion="squared_error", random_state=42
+    )
     rf.fit(X, y)
 
     # Predict
@@ -135,13 +141,22 @@ def main():
 
     # print feature importances
     # TODO: in future, can be logged and plotted
-    importances = pd.Series(rf.feature_importances_, index=X.columns)
+    importances = pd.Series(rf.get_feature_importances(), index=X.columns)
     print(importances.sort_values(ascending=False))
 
     # plotting
     region_grid = gridpred.region_grid
     visualize_predictions(region_grid, y_pred)
 
+    # metrics
+    print(
+        evaluate(
+            y_true=gridpred.eval,
+            y_pred=y_pred,
+            metrics=[pai, pei, rri],
+            region_grid=region_grid,
+        )
+    )
 
 
 if __name__ == "__main__":
