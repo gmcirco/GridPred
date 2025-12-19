@@ -1,38 +1,45 @@
 import numpy as np
 import pandas as pd
-
+import inspect
 
 def evaluate(y_true, y_pred, metrics=None, round_digits=2, **kwargs):
     """
-    Evaluate model performance using a list of metric functions. Can
-    pass functions directly, or a dict mapping a string metric to the
-    function.
+    Evaluate model performance using a list or dict of metric functions.
+    Automatically filters keyword args to match each metric's signature.
     """
     results = {}
 
     if metrics is None:
         return results
 
-    for m in metrics:
-        if isinstance(m, str):
-            # Assuming 'metrics' is a registry for string lookups
-            func = metrics.get(m)
-            if func is None:
-                raise ValueError(f"Metric '{m}' not found.")
-            name = m
-        else:
-            func = m
-            name = func.__name__
+    # Handle dict or list
+    if isinstance(metrics, dict):
+        metric_items = metrics.items()
+    else:  # list of functions or names
+        metric_items = [(m, m) for m in metrics]
 
-        # Calculate the metric value
-        metric_value = func(y_true, y_pred, **kwargs)
-        
-        if round_digits is not None and round_digits >= 0:
-            rounded_value = round(metric_value, round_digits)
+    for name, m in metric_items:
+        # If name is string, map to function (registry)
+        if isinstance(name, str):
+            func = metrics[name]
+            metric_name = name
         else:
-            rounded_value = metric_value
-        
-        results[name] = float(rounded_value)
+            func = name
+            metric_name = func.__name__
+
+        # Filter kwargs to only those accepted by the function
+        sig = inspect.signature(func)
+        accepted_params = sig.parameters.keys()
+
+        filtered_kwargs = {k: v for k, v in kwargs.items() if k in accepted_params}
+
+        # Compute metric value
+        metric_value = func(y_true, y_pred, **filtered_kwargs)
+
+        if round_digits is not None and round_digits >= 0:
+            metric_value = round(metric_value, round_digits)
+
+        results[metric_name] = float(metric_value)
 
     return results
 
