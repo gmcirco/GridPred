@@ -6,6 +6,7 @@ import numpy as np
 
 DEFAULT_PROJECTED_CRS = "3857"  # note, not ideal for accuracy
 
+
 class GridPred:
     def __init__(
         self,
@@ -28,7 +29,6 @@ class GridPred:
         self.features_points = None
         if input_features_data is not None:
             self.features_points = self._raw_points_from_tabular(input_features_data)
-
 
         # load optional study region
         self.study_region = None
@@ -61,15 +61,12 @@ class GridPred:
         elif isinstance(data, str):
             df = pd.read_csv(data)
         else:
-            raise TypeError(
-                "Input must be a pandas DataFrame or a path to a CSV file."
-            )
+            raise TypeError("Input must be a pandas DataFrame or a path to a CSV file.")
 
         if fields_to_lower:
             df.columns = [c.lower() for c in df.columns]
 
         return df
-
 
     def _contains_long_lat(self, listcols) -> bool:
         "Check if long-lat colums are present in input csv"
@@ -151,11 +148,14 @@ class GridPred:
             if projected_crs is None:
                 if self.study_region is not None and self.study_region.crs is not None:
                     projected_crs = self.study_region.crs
-                    print(f"No projected CRS provided — adopting region CRS {projected_crs}")
+                    print(
+                        f"No projected CRS provided — adopting region CRS {projected_crs}"
+                    )
                 else:
-                    print(f"No projected CRS provided — defaulting to {DEFAULT_PROJECTED_CRS}")
+                    print(
+                        f"No projected CRS provided — defaulting to {DEFAULT_PROJECTED_CRS}"
+                    )
                     projected_crs = DEFAULT_PROJECTED_CRS
-
 
         return points_spatial, features, region
 
@@ -224,7 +224,6 @@ class GridPred:
             print(f"No projected CRS provided — defaulting to {DEFAULT_PROJECTED_CRS}")
             projected_crs = DEFAULT_PROJECTED_CRS
 
-
         # do pre-processing on provided features
         points_spatial, features_spatial, study_region = self.load_and_process_inputs(
             self.crime_points,
@@ -261,7 +260,7 @@ class GridPred:
 
         # --------- Add Features ---------#
 
-        # then functionality to perform grid counts of outcome variable
+        # then functionality to perform grid counts of outcome variable events
         # and add spatial risk factors
         unique_times = sorted(clipped_points[self.timevar].unique().tolist())
 
@@ -269,7 +268,7 @@ class GridPred:
             polygon_counts = self._count_point_in_polygon(
                 clipped_points[clipped_points[self.timevar] == time], self.region_grid
             )
-            self.region_grid[f"crimes_{time}"] = (
+            self.region_grid[f"events_{time}"] = (
                 self.region_grid.index.map(polygon_counts).fillna(0).astype(int)
             )
 
@@ -301,11 +300,11 @@ class GridPred:
                 self.region_grid[type] = feature_dist
 
         # Assuming unique_types contains the risk factors (e.g., 'gas_station', 'bar')
-        crime_pred_features = [f"crimes_{t}" for t in time_fit]
+        crime_pred_features = [f"events_{t}" for t in time_fit]
         pred_features = crime_pred_features + unique_types + ["x", "y"]
 
-        target = f"crimes_{time_test}"
-        eval_target = f"crimes_{time_eval}"
+        target = f"events_{time_test}"
+        eval_target = f"events_{time_eval}"
 
         self.X = self.region_grid[pred_features]
         self.y = self.region_grid[target]
