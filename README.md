@@ -34,6 +34,7 @@ Demo data from Hartford, CT are provided in input for testing purposes.
 ## Future Enhancements
 
 - [ ] Add additional ML models (XGBoost, LightGBM, etc.)
+- [ ] Add SHAP explainers
 - [x] Spatial visualization of model outputs
 - [x] Automated scoring and metrics output (PAI, PEI, RRI)
 
