@@ -1,10 +1,11 @@
 from abc import ABC, abstractmethod
-from typing import Any, List, Tuple, Optional, Union, Dict
+from typing import Any, List, Optional, Union
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 import skexplain
+
 
 class GridPredPredictor(ABC):
     def __init__(self, ale_params: Optional[dict] = None, **model_params):
@@ -19,7 +20,7 @@ class GridPredPredictor(ABC):
             'n_jobs': 1
         }
 
-        # or override user-provided dict if it exists
+        # override with user-provided dict if it exists
         if ale_params:
             self.ale_params.update(ale_params)
 
@@ -41,7 +42,6 @@ class GridPredPredictor(ABC):
         
         self.model.fit(X, y)
         
-        # Cache data for post-hoc explanations
         self._X_fit = X.copy()
         self._y_fit = y.copy()
 
@@ -73,7 +73,6 @@ class GridPredPredictor(ABC):
         if self._explainer is None:
             if self.model is None:
                 raise RuntimeError("Model must be fit before explaining.")
-            # skexplain requires a name-model tuple
             self._explainer = skexplain.ExplainToolkit(
                 estimators=(type(self.model).__name__, self.model),
                 X=self._X_fit,
@@ -84,11 +83,11 @@ class GridPredPredictor(ABC):
     def run_ale(self, features: Union[str, List] = 'all', **kwargs):
         """
         Computes ALE using merged parameters.
-        **kwargs here take the highest priority (e.g. model.run_ale(n_bins=50)).
+        **kwargs take the highest priority (e.g. model.run_ale(n_bins=50)).
         """
         explainer = self._init_explainer()
         
-        # 3. Merge: Global Defaults < Class Init Params < Method Call Params
+        # Merge: Global Defaults < Class Init Params < Method Call Params
         run_params = {**self.ale_params, **kwargs}
 
         if isinstance(features, list) and len(features) > 0 and isinstance(features[0], tuple):
@@ -102,10 +101,17 @@ class GridPredPredictor(ABC):
 
     # --- ALE Plotting Logic ---
 
-    def plot_ale_1d(self, feature: str, xlim=None, ylim=None):
-        """Plots the 1D ALE for a specific feature."""
+    def plot_ale_1d(self, feature: str, ale_kwargs: Optional[dict] = None, plot_kwargs: Optional[dict] = None):
+        """
+        Plots the 1D ALE for a specific feature.
+        ale_kwargs  → forwarded to run_ale()  (e.g. n_bins, n_bootstrap)
+        plot_kwargs → consumed here for visual params (e.g. xlim, ylim, color)
+        """
+        ale_kwargs  = ale_kwargs  or {}
+        plot_kwargs = plot_kwargs or {}
+
         if self._ale_ds_1d is None:
-            self.run_ale(features='all')
+            self.run_ale(features='all', **ale_kwargs)
 
         ds = self._ale_ds_1d
         model_name = type(self.model).__name__
@@ -113,55 +119,60 @@ class GridPredPredictor(ABC):
         v_bin = ds[f"{feature}__bin_values"].values
         v_ale = ds[f"{feature}__{model_name}__ale"].values
 
-        # Aggregate across bootstrap iterations
         val_min, val_avg, val_max = v_ale.min(axis=0), v_ale.mean(axis=0), v_ale.max(axis=0)
 
-        plt.figure(figsize=(5, 4))
-        plt.fill_between(v_bin, val_min, val_max, alpha=0.2, color='#0077BB')
-        sns.lineplot(x=v_bin, y=val_avg, color='#0077BB', label='Mean ALE')
+        color   = plot_kwargs.pop('color',   '#0077BB')
+        xlim    = plot_kwargs.pop('xlim',    None)
+        ylim    = plot_kwargs.pop('ylim',    None)
+        figsize = plot_kwargs.pop('figsize', (5, 4))
+
+        plt.figure(figsize=figsize)
+        plt.fill_between(v_bin, val_min, val_max, alpha=0.2, color=color)
+        sns.lineplot(x=v_bin, y=val_avg, color=color, label='Mean ALE')
         plt.axhline(y=0, color='#CC3311', linestyle='--', linewidth=1)
-        
         plt.title(f"1D ALE: {feature}")
         if xlim: plt.xlim(xlim)
         if ylim: plt.ylim(ylim)
         sns.despine()
         plt.show()
 
-    def plot_ale_2d(self, feat_x: str, feat_y: str, clim=None):
-        """Plots the 2D interaction ALE for two features."""
+    def plot_ale_2d(self, feat_x: str, feat_y: str, ale_kwargs: Optional[dict] = None, plot_kwargs: Optional[dict] = None):
+        """
+        Plots the 2D interaction ALE for two features.
+        ale_kwargs  → forwarded to run_ale()  (e.g. n_bins, n_bootstrap)
+        plot_kwargs → consumed here for visual params (e.g. clim, cmap, figsize)
+        """
+        ale_kwargs  = ale_kwargs  or {}
+        plot_kwargs = plot_kwargs or {}
+
         pair = tuple(sorted((feat_x, feat_y)))
         if pair not in self._ale_ds_2d:
-            self.run_ale(features=[pair])
+            self.run_ale(features=[pair], **ale_kwargs)
 
         ds = self._ale_ds_2d[pair]
         model_name = type(self.model).__name__
 
-        # 1. Identify which feature is indexed as 'dim_0' vs 'dim_1' in the ALE array
-        # skexplain usually lists them in the order they were passed to run_ale
         key = f"{feat_x}__{feat_y}__{model_name}__ale"
         if key in ds:
             ale_vals = ds[key].values.mean(axis=0)
         else:
-            # If the user swapped the order, we look for the alternative key
-            # and transpose the ALE values to match (feat_x, feat_y)
             key = f"{feat_y}__{feat_x}__{model_name}__ale"
-            ale_vals = ds[key].values.mean(axis=0).T # Transpose to align
+            ale_vals = ds[key].values.mean(axis=0).T
 
         x_bin = ds[f"{feat_x}__bin_values"].values
         y_bin = ds[f"{feat_y}__bin_values"].values
+        X, Y  = np.meshgrid(x_bin, y_bin, indexing="ij")
 
-        # 2. Use indexing="ij" for the meshgrid (Matrix style)
-        X, Y = np.meshgrid(x_bin, y_bin, indexing="ij")
+        clim    = plot_kwargs.pop('clim',    None)
+        figsize = plot_kwargs.pop('figsize', (7, 6))
+        cmap    = plot_kwargs.pop('cmap',    'RdBu_r')
+        levels  = plot_kwargs.pop('levels',  20)
 
-        # 3. Handle Scaling
         vmax = np.abs(ale_vals).max() if clim is None else clim[1]
-        vmin = -vmax if clim is None else clim[0]
+        vmin = -vmax                  if clim is None else clim[0]
 
-        # 4. Plot
-        plt.figure(figsize=(7, 6))
-        # Note: We pass ale_vals directly now because it is aligned with X and Y
-        contour = plt.contourf(X, Y, ale_vals, levels=20, cmap="RdBu_r", vmin=vmin, vmax=vmax)
-        
+        plt.figure(figsize=figsize)
+        contour = plt.contourf(X, Y, ale_vals, levels=levels, cmap=cmap, vmin=vmin, vmax=vmax)
         plt.colorbar(contour, label="ALE Effect")
         plt.title(f"2D ALE Interaction: {feat_x} vs {feat_y}")
         plt.xlabel(feat_x)
