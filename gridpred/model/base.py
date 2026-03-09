@@ -11,13 +11,13 @@ class GridPredPredictor(ABC):
     def __init__(self, ale_params: Optional[dict] = None, **model_params):
         self.model = None
         self.model_params = model_params
-        
+
         # default ale params
         self.ale_params = {
-            'n_bootstrap': 5, 
-            'subsample': 500, 
-            'n_bins': 10, 
-            'n_jobs': 1
+            "n_bootstrap": 5,
+            "subsample": 500,
+            "n_bins": 10,
+            "n_jobs": 1,
         }
 
         # override with user-provided dict if it exists
@@ -39,14 +39,14 @@ class GridPredPredictor(ABC):
         """Fit the model and cache data for ALE calculations."""
         if self.model is None:
             self.model = self.build_model()
-        
+
         self.model.fit(X, y)
-        
+
         self._X_fit = X.copy()
         self._y_fit = y.copy()
 
         # Reset explainer if re-fitting
-        self._explainer = None 
+        self._explainer = None
         self._ale_ds_1d = None
         self._ale_ds_2d = {}
 
@@ -64,7 +64,9 @@ class GridPredPredictor(ABC):
         if hasattr(self.model, "feature_importances_"):
             return pd.Series(self.model.feature_importances_, index=self._X_fit.columns)
         else:
-            raise AttributeError(f"{type(self.model).__name__} does not provide feature importances.")
+            raise AttributeError(
+                f"{type(self.model).__name__} does not provide feature importances."
+            )
 
     # --- ALE Computation Logic ---
 
@@ -80,69 +82,90 @@ class GridPredPredictor(ABC):
             )
         return self._explainer
 
-    def run_ale(self, features: Union[str, List] = 'all', **kwargs):
+    def run_ale(self, features: Union[str, List] = "all", **kwargs):
         """
         Computes ALE using merged parameters.
         **kwargs take the highest priority (e.g. model.run_ale(n_bins=50)).
         """
         explainer = self._init_explainer()
-        
+
         # Merge: Global Defaults < Class Init Params < Method Call Params
         run_params = {**self.ale_params, **kwargs}
 
-        if isinstance(features, list) and len(features) > 0 and isinstance(features[0], tuple):
+        if (
+            isinstance(features, list)
+            and len(features) > 0
+            and isinstance(features[0], tuple)
+        ):
             ds = explainer.ale(features=features, **run_params)
             for pair in features:
                 self._ale_ds_2d[tuple(sorted(pair))] = ds
         else:
             self._ale_ds_1d = explainer.ale(features=features, **run_params)
-        
-        return self 
+
+        return self
 
     # --- ALE Plotting Logic ---
 
-    def plot_ale_1d(self, feature: str, ale_kwargs: Optional[dict] = None, plot_kwargs: Optional[dict] = None):
+    def plot_ale_1d(
+        self,
+        feature: str,
+        ale_kwargs: Optional[dict] = None,
+        plot_kwargs: Optional[dict] = None,
+    ):
         """
         Plots the 1D ALE for a specific feature.
         ale_kwargs  → forwarded to run_ale()  (e.g. n_bins, n_bootstrap)
         plot_kwargs → consumed here for visual params (e.g. xlim, ylim, color)
         """
-        ale_kwargs  = ale_kwargs  or {}
+        ale_kwargs = ale_kwargs or {}
         plot_kwargs = plot_kwargs or {}
 
         if self._ale_ds_1d is None:
-            self.run_ale(features='all', **ale_kwargs)
+            self.run_ale(features="all", **ale_kwargs)
 
         ds = self._ale_ds_1d
         model_name = type(self.model).__name__
-        
+
         v_bin = ds[f"{feature}__bin_values"].values
         v_ale = ds[f"{feature}__{model_name}__ale"].values
 
-        val_min, val_avg, val_max = v_ale.min(axis=0), v_ale.mean(axis=0), v_ale.max(axis=0)
+        val_min, val_avg, val_max = (
+            v_ale.min(axis=0),
+            v_ale.mean(axis=0),
+            v_ale.max(axis=0),
+        )
 
-        color   = plot_kwargs.pop('color',   '#0077BB')
-        xlim    = plot_kwargs.pop('xlim',    None)
-        ylim    = plot_kwargs.pop('ylim',    None)
-        figsize = plot_kwargs.pop('figsize', (5, 4))
+        color = plot_kwargs.pop("color", "#0077BB")
+        xlim = plot_kwargs.pop("xlim", None)
+        ylim = plot_kwargs.pop("ylim", None)
+        figsize = plot_kwargs.pop("figsize", (5, 4))
 
         plt.figure(figsize=figsize)
         plt.fill_between(v_bin, val_min, val_max, alpha=0.2, color=color)
-        sns.lineplot(x=v_bin, y=val_avg, color=color, label='Mean ALE')
-        plt.axhline(y=0, color='#CC3311', linestyle='--', linewidth=1)
+        sns.lineplot(x=v_bin, y=val_avg, color=color, label="Mean ALE")
+        plt.axhline(y=0, color="#CC3311", linestyle="--", linewidth=1)
         plt.title(f"1D ALE: {feature}")
-        if xlim: plt.xlim(xlim)
-        if ylim: plt.ylim(ylim)
+        if xlim:
+            plt.xlim(xlim)
+        if ylim:
+            plt.ylim(ylim)
         sns.despine()
         plt.show()
 
-    def plot_ale_2d(self, feat_x: str, feat_y: str, ale_kwargs: Optional[dict] = None, plot_kwargs: Optional[dict] = None):
+    def plot_ale_2d(
+        self,
+        feat_x: str,
+        feat_y: str,
+        ale_kwargs: Optional[dict] = None,
+        plot_kwargs: Optional[dict] = None,
+    ):
         """
         Plots the 2D interaction ALE for two features.
         ale_kwargs  → forwarded to run_ale()  (e.g. n_bins, n_bootstrap)
         plot_kwargs → consumed here for visual params (e.g. clim, cmap, figsize)
         """
-        ale_kwargs  = ale_kwargs  or {}
+        ale_kwargs = ale_kwargs or {}
         plot_kwargs = plot_kwargs or {}
 
         pair = tuple(sorted((feat_x, feat_y)))
@@ -161,18 +184,20 @@ class GridPredPredictor(ABC):
 
         x_bin = ds[f"{feat_x}__bin_values"].values
         y_bin = ds[f"{feat_y}__bin_values"].values
-        X, Y  = np.meshgrid(x_bin, y_bin, indexing="ij")
+        X, Y = np.meshgrid(x_bin, y_bin, indexing="ij")
 
-        clim    = plot_kwargs.pop('clim',    None)
-        figsize = plot_kwargs.pop('figsize', (7, 6))
-        cmap    = plot_kwargs.pop('cmap',    'RdBu_r')
-        levels  = plot_kwargs.pop('levels',  20)
+        clim = plot_kwargs.pop("clim", None)
+        figsize = plot_kwargs.pop("figsize", (7, 6))
+        cmap = plot_kwargs.pop("cmap", "RdBu_r")
+        levels = plot_kwargs.pop("levels", 20)
 
         vmax = np.abs(ale_vals).max() if clim is None else clim[1]
-        vmin = -vmax                  if clim is None else clim[0]
+        vmin = -vmax if clim is None else clim[0]
 
         plt.figure(figsize=figsize)
-        contour = plt.contourf(X, Y, ale_vals, levels=levels, cmap=cmap, vmin=vmin, vmax=vmax)
+        contour = plt.contourf(
+            X, Y, ale_vals, levels=levels, cmap=cmap, vmin=vmin, vmax=vmax
+        )
         plt.colorbar(contour, label="ALE Effect")
         plt.title(f"2D ALE Interaction: {feat_x} vs {feat_y}")
         plt.xlabel(feat_x)
