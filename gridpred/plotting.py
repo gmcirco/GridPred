@@ -3,12 +3,12 @@ import matplotlib.pyplot as plt
 
 
 def visualize(points_gdf, grid_gdf, region_gdf):
-    """Quick visualization of crime points, grid, and region boundary."""
+    """Quick visualization of incident points, grid, and region boundary."""
     _, ax = plt.subplots(figsize=(8, 8))
     region_gdf.plot(ax=ax, color="none", edgecolor="black", linewidth=1)
     grid_gdf.plot(ax=ax, color="none", edgecolor="lightgray")
     points_gdf.plot(ax=ax, color="red", markersize=5, alpha=0.5)
-    plt.title("Crime Points and Grid")
+    plt.title("Incident Points and Grid")
     plt.show()
 
 
@@ -67,5 +67,5 @@ def visualize_predictions(
         )
 
     ax.set_axis_off()
-    ax.set_title(title or "Predicted Crime Intensity", fontsize=14)
+    ax.set_title(title or "Predicted Incident Intensity", fontsize=14)
     plt.show()
