@@ -12,6 +12,9 @@ FEATVAR := types
 INPUT_CRS := 3508
 PROJECTED_CRS := 3508
 GRID_SIZE := 400
+# Set this to your application identifier to opt in to OSM tiles.
+OSM_USER_AGENT ?=
+OSM_ARGS = $(if $(strip $(OSM_USER_AGENT)),--use-osm --osm-user-agent "$(OSM_USER_AGENT)")
 
 # Default run with ALL inputs present
 run:
@@ -24,7 +27,7 @@ run:
 		--input_crs $(INPUT_CRS) \
 		--projected_crs $(PROJECTED_CRS) \
 		--do_projection \
-		--grid_size $(GRID_SIZE)
+		--grid_size $(GRID_SIZE) $(OSM_ARGS)
 
 # Run WITHOUT region
 run-noregion:
@@ -36,7 +39,7 @@ run-noregion:
 		--input_crs $(INPUT_CRS) \
 		--projected_crs $(PROJECTED_CRS) \
 		--do_projection \
-		--grid_size $(GRID_SIZE)
+		--grid_size $(GRID_SIZE) $(OSM_ARGS)
 
 # Run WITHOUT spatial predictors
 run-nopreds:
@@ -47,7 +50,7 @@ run-nopreds:
 		--input_crs $(INPUT_CRS) \
 		--projected_crs $(PROJECTED_CRS) \
 		--do_projection \
-		--grid_size $(GRID_SIZE)
+		--grid_size $(GRID_SIZE) $(OSM_ARGS)
 
 # Install dependencies with uv
 install:

@@ -30,7 +30,8 @@ def visualize_grid_by_feature(gdf, feature):
 
 
 def visualize_predictions(
-    gdf, predictions, title="", cmap="viridis", use_osm=True, zoom=12
+    gdf, predictions, title="", cmap="viridis", use_osm=False, zoom=12,
+    osm_user_agent=None,
 ):
     """
     Plots a GeoDataFrame grid colored by predictions, optionally overlaid on an OpenStreetMap basemap.
@@ -40,14 +41,18 @@ def visualize_predictions(
     - predictions: array-like of predicted values, same length as gdf.
     - title: str, plot title.
     - cmap: colormap for the values.
-    - use_osm: bool, whether to include an OpenStreetMap basemap.
+    - use_osm: bool, whether to include an OpenStreetMap basemap (default: False).
     - zoom: int, zoom level for the OSM tiles.
+    - osm_user_agent: str, application identifier required when use_osm is True.
     """
+    if use_osm and (not osm_user_agent or not osm_user_agent.strip()):
+        raise ValueError("osm_user_agent is required when use_osm=True")
+
     gdf = gdf.copy()
     gdf["pred"] = predictions
 
-    # Ensure the GeoDataFrame is in the correct CRS for OSM (EPSG:3857)
-    if gdf.crs is None or gdf.crs.to_string() != "EPSG:3857":
+    # OSM tiles use EPSG:3857; preserve the input CRS when no basemap is requested.
+    if use_osm and (gdf.crs is None or gdf.crs.to_string() != "EPSG:3857"):
         gdf = gdf.to_crs(epsg=3857)
 
     _, ax = plt.subplots(1, 1, figsize=(10, 10))
@@ -63,7 +68,11 @@ def visualize_predictions(
 
     if use_osm:
         ctx.add_basemap(
-            ax, crs=gdf.crs, source=ctx.providers.OpenStreetMap.Mapnik, zoom=zoom
+            ax,
+            crs=gdf.crs,
+            source=ctx.providers.OpenStreetMap.Mapnik,
+            zoom=zoom,
+            headers={"User-Agent": osm_user_agent},
         )
 
     ax.set_axis_off()

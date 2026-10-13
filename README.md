@@ -31,6 +31,33 @@ make install
 
 Demo data from Hartford, CT are provided in input for testing purposes.
 
+### OpenStreetMap basemap
+
+The prediction plot does not request OpenStreetMap tiles by default. To include
+an OSM basemap in a Makefile run, supply a User-Agent that identifies your
+application:
+
+```bash
+make run OSM_USER_AGENT='YourApp/1.0 (+https://example.org)'
+```
+
+The same option works with `run-noregion` and `run-nopreds`. When calling
+`main.py` directly, add `--use-osm --osm-user-agent 'YourApp/1.0 (+https://example.org)'`
+to your existing command. When using the plotting function from Python:
+
+```python
+from gridpred.plotting import visualize_predictions
+
+visualize_predictions(
+    grid, predictions,
+    use_osm=True,
+    osm_user_agent="YourApp/1.0 (+https://example.org)",
+)
+```
+
+Use your own application name and contact URL, following the
+[OpenStreetMap tile usage policy](https://operations.osmfoundation.org/policies/tiles/).
+
 ## Future Enhancements
 
 - [ ] Add additional ML models (XGBoost, LightGBM, etc.)
