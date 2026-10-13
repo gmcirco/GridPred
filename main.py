@@ -79,8 +79,20 @@ def get_parser_args() -> Namespace:
         default=300,
         help="Size of the grid cell units (e.g., 300 meters).",
     )
+    parser.add_argument(
+        "--use-osm",
+        action="store_true",
+        help="Include an OpenStreetMap basemap (requires --osm-user-agent).",
+    )
+    parser.add_argument(
+        "--osm-user-agent",
+        help="User-Agent identifying your application to the OpenStreetMap tile server.",
+    )
 
-    return parser.parse_args()
+    args = parser.parse_args()
+    if args.use_osm and (not args.osm_user_agent or not args.osm_user_agent.strip()):
+        parser.error("--osm-user-agent is required when --use-osm is set")
+    return args
 
 
 def export_results(gridpred_model, preds, filename="preds.csv"):
@@ -146,7 +158,9 @@ def main():
 
     # plotting
     region_grid = gridpred.region_grid
-    visualize_predictions(region_grid, y_pred)
+    visualize_predictions(
+        region_grid, y_pred, use_osm=args.use_osm, osm_user_agent=args.osm_user_agent
+    )
 
     # metrics
     print(
